@@ -14,7 +14,7 @@ ootDir)를 WebDAV와 FTP 프로토콜을 통해 동시에 접근하고 관리할
 
 ## 📁 프로젝트 구조
 
-`	ext
+```	ext
 ├── main.go             # 서버 진입점 (WebDAV/FTP 동시 실행)
 ├── auth.json           # 사용자 인증 및 권한 설정 파일
 ├── spec/               # WebDAV 상세 명세서
@@ -23,7 +23,7 @@ ootDir)를 WebDAV와 FTP 프로토콜을 통해 동시에 접근하고 관리할
     ├── webdav/         # WebDAV 서버 구현 (Gin 연동)
     ├── ftp/            # FTP 서버 구현 (Main/Client 드라이버)
     └── LS/             # 통합 LockSystem (MemoryLS 등)
-`
+```
 
 ## 🛠 설정 방법
 
