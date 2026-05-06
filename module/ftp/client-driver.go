@@ -12,21 +12,24 @@ import (
 
 type FtpClientDriver struct {
 	afero.Fs
-	lockSystem  webdav.LockSystem
-	authManager *auth.Auth
-	rootDir     string
 	user        string
-	password    string
+	lockSystem  webdav.LockSystem
+	authManager auth.AuthManager
+	rootDir     string
 }
 
-func newClientDriver(rootDir string, lockSystem webdav.LockSystem, authManager *auth.Auth, user string, password string) *FtpClientDriver {
+func newClientDriver(
+	user string,
+	rootDir string,
+	lockSystem webdav.LockSystem,
+	authManager auth.AuthManager,
+) *FtpClientDriver {
 	driver := &FtpClientDriver{
 		Fs:          afero.NewBasePathFs(afero.NewOsFs(), rootDir),
+		user:        user,
 		rootDir:     rootDir,
 		lockSystem:  lockSystem,
 		authManager: authManager,
-		user:        user,
-		password:    password,
 	}
 	return driver
 }

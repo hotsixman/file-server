@@ -1,6 +1,7 @@
 package webdav
 
 import (
+	fs "file-server/module/Fs"
 	"file-server/module/auth"
 	"strings"
 
@@ -11,15 +12,18 @@ import (
 type WebdavApp struct {
 	engine      *gin.Engine
 	dav         *webdav.Handler
-	authManager *auth.Auth
+	authManager auth.AuthManager
 }
 
-func NewWebdavApp(rootDir string, lockSystem webdav.LockSystem, authManager *auth.Auth) *WebdavApp {
+func NewWebdavApp(rootDir string, lockSystem webdav.LockSystem, authManager auth.AuthManager) *WebdavApp {
 	app := &WebdavApp{
 		engine: gin.Default(),
 		dav: &webdav.Handler{
-			Prefix:     "/dav",
-			FileSystem: webdav.Dir(rootDir),
+			Prefix: "/dav",
+			FileSystem: fs.NewFs(map[string]string{
+				"/":    "test",
+				"/foo": "test2",
+			}).ToWebdavFs(),
 			LockSystem: lockSystem,
 		},
 		authManager: authManager,

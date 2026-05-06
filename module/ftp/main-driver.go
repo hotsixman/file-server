@@ -14,7 +14,7 @@ type FtpMainDriver struct {
 	ftpserverlib.MainDriver
 	rootDir     string
 	lockSystem  webdav.LockSystem
-	authManager *auth.Auth
+	authManager auth.AuthManager
 	address     string
 	listener    net.Listener
 }
@@ -41,7 +41,7 @@ func (driver *FtpMainDriver) AuthUser(cc ftpserverlib.ClientContext, user, pass 
 	if !driver.authManager.Authenticate(user, pass) {
 		return nil, errors.New("Invalid User or Password.")
 	}
-	return newClientDriver(driver.rootDir, driver.lockSystem, driver.authManager, user, pass), nil
+	return newClientDriver(user, driver.rootDir, driver.lockSystem, driver.authManager), nil
 }
 
 func (driver *FtpMainDriver) GetTLSConfig() (*tls.Config, error) {
