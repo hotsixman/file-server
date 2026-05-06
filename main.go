@@ -24,7 +24,7 @@ func main() {
 	}
 
 	webdavApp := webdav.NewWebdavApp(os.Getenv("ROOT_DIR"), lockSystem, authManager)
-	ftpApp := ftp.NewFtpApp(os.Getenv("ROOT_DIR"), lockSystem, authManager)
+	ftpApp := ftp.NewFtpApp(os.Getenv("ROOT_DIR"), authManager)
 	go webdavApp.Listen("localhost:3000")
 	go ftpApp.Listen("localhost:21")
 	log.Println("Listen")

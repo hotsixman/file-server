@@ -2,18 +2,16 @@ package ftp
 
 import (
 	"errors"
+	fs "file-server/module/Fs"
 	"file-server/module/auth"
 	"os"
-	"time"
 
 	"github.com/spf13/afero"
-	"golang.org/x/net/webdav"
 )
 
 type FtpClientDriver struct {
 	afero.Fs
 	user        string
-	lockSystem  webdav.LockSystem
 	authManager auth.AuthManager
 	rootDir     string
 }
@@ -21,14 +19,16 @@ type FtpClientDriver struct {
 func newClientDriver(
 	user string,
 	rootDir string,
-	lockSystem webdav.LockSystem,
 	authManager auth.AuthManager,
 ) *FtpClientDriver {
 	driver := &FtpClientDriver{
-		Fs:          afero.NewBasePathFs(afero.NewOsFs(), rootDir),
+		Fs: fs.NewFs(map[string]string{
+			"/":        "test",
+			"/foo":     "test2",
+			"/foo/bar": "test3",
+		}),
 		user:        user,
 		rootDir:     rootDir,
-		lockSystem:  lockSystem,
 		authManager: authManager,
 	}
 	return driver
@@ -53,14 +53,6 @@ func (driver *FtpClientDriver) OpenFile(path string, flag int, perm os.FileMode)
 		return nil, errors.New("No Permission.")
 	}
 
-	if flag&os.O_WRONLY != 0 || flag&os.O_RDWR != 0 || flag&os.O_APPEND != 0 {
-		release, err := driver.lockSystem.Confirm(time.Now(), path, "")
-		if err != nil {
-			return nil, err
-		}
-		release()
-	}
-
 	file, err := driver.Fs.OpenFile(path, flag, perm)
 	if err != nil {
 		return nil, err
@@ -74,11 +66,6 @@ func (driver *FtpClientDriver) Remove(path string) error {
 		return errors.New("No Permission.")
 	}
 
-	release, err := driver.lockSystem.Confirm(time.Now(), path, "")
-	if err != nil {
-		return err
-	}
-	release()
 	return driver.Fs.Remove(path)
 }
 
@@ -87,11 +74,6 @@ func (driver *FtpClientDriver) RemoveAll(path string) error {
 		return errors.New("No Permission.")
 	}
 
-	release, err := driver.lockSystem.Confirm(time.Now(), path, "")
-	if err != nil {
-		return err
-	}
-	release()
 	return driver.Fs.RemoveAll(path)
 }
 
@@ -100,10 +82,5 @@ func (driver *FtpClientDriver) Rename(oldpath, newpath string) error {
 		return errors.New("No Permission.")
 	}
 
-	release, err := driver.lockSystem.Confirm(time.Now(), oldpath, newpath)
-	if err != nil {
-		return err
-	}
-	release()
 	return driver.Fs.Rename(oldpath, newpath)
 }

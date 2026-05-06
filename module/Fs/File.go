@@ -1,7 +1,6 @@
 package fs
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -23,6 +22,13 @@ func wrapFile(file afero.File, fs *Fs, virtualChildren []string) *File {
 	return &File{File: file, fs: fs, virtualChildren: virtualChildren}
 }
 
+func wrapStat(stat os.FileInfo, name string) *FileInfo {
+	return &FileInfo{
+		FileInfo: stat,
+		name:     name,
+	}
+}
+
 func (file *File) Readdir(count int) ([]os.FileInfo, error) {
 	infos, err := file.File.Readdir(count)
 	if err != nil {
@@ -33,15 +39,11 @@ func (file *File) Readdir(count int) ([]os.FileInfo, error) {
 		for _, child := range file.virtualChildren {
 			stat, err := file.fs.Stat(child)
 			if err == nil {
-				infos = append(infos, &FileInfo{
-					FileInfo: stat,
-					name:     filepath.Base(filepath.Clean(child)),
-				})
+				infos = append(infos, wrapStat(stat, filepath.Base(filepath.Clean(child))))
 			}
 		}
 	}
 
-	fmt.Println(infos)
 	if count <= 0 || len(infos) <= count {
 		return infos, nil
 	} else {

@@ -125,7 +125,11 @@ func (fs *Fs) Rename(oldname, newname string) error {
 }
 
 func (fs *Fs) Stat(name string) (os.FileInfo, error) {
-	return os.Stat(fs.RealPath(name))
+	stat, err := os.Stat(fs.RealPath(name))
+	if err != nil {
+		return nil, err
+	}
+	return wrapStat(stat, filepath.Base(filepath.Clean(name))), nil
 }
 
 func (fs *Fs) Name() string {

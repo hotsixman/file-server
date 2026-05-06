@@ -5,7 +5,6 @@ import (
 	"net"
 
 	ftpserver "github.com/fclairamb/ftpserverlib"
-	"golang.org/x/net/webdav"
 )
 
 type FtpApp struct {
@@ -14,8 +13,8 @@ type FtpApp struct {
 	authManager auth.AuthManager
 }
 
-func NewFtpApp(rootDir string, lockSystem webdav.LockSystem, authManager auth.AuthManager) *FtpApp {
-	driver := newMainDriver(rootDir, lockSystem)
+func NewFtpApp(rootDir string, authManager auth.AuthManager) *FtpApp {
+	driver := newMainDriver(rootDir)
 	app := &FtpApp{
 		server:      ftpserver.NewFtpServer(driver),
 		driver:      driver,
