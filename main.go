@@ -17,7 +17,7 @@ func init() {
 
 func main() {
 	lockSystem := LS.NewMemLS()
-	authManager, err := auth.LoadAuth("auth.json")
+	authManager, err := auth.NewSqliteAM()
 	if err != nil {
 		log.Println(err)
 		return

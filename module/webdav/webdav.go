@@ -11,22 +11,19 @@ import (
 
 type WebdavApp struct {
 	engine      *gin.Engine
-	dav         *webdav.Handler
 	authManager auth.AuthManager
+	lockSystem  webdav.LockSystem
+	davMap      map[string]*webdav.Handler
+	rootDir     string
 }
 
 func NewWebdavApp(rootDir string, lockSystem webdav.LockSystem, authManager auth.AuthManager) *WebdavApp {
 	app := &WebdavApp{
-		engine: gin.Default(),
-		dav: &webdav.Handler{
-			Prefix: "/dav",
-			FileSystem: fs.NewFs(map[string]string{
-				"/":    "test",
-				"/foo": "test2",
-			}).ToWebdavFs(),
-			LockSystem: lockSystem,
-		},
+		engine:      gin.Default(),
 		authManager: authManager,
+		lockSystem:  lockSystem,
+		davMap:      map[string]*webdav.Handler{},
+		rootDir:     rootDir,
 	}
 
 	app.registerHandlers()
@@ -45,37 +42,37 @@ func (app *WebdavApp) registerHandlers() {
 	}
 	for _, method := range methods {
 		app.engine.Handle(method, "/dav", func(c *gin.Context) {
-			user, password, ok := c.Request.BasicAuth()
+			username, password, ok := c.Request.BasicAuth()
 			if !ok {
-				user = c.Request.URL.User.Username()
+				username = c.Request.URL.User.Username()
 				password, _ = c.Request.URL.User.Password()
 			}
 
-			if !app.checkPermission(user, password, c.Request.URL.Path) {
+			if !app.Permission(username, password, c.Request.URL.Path) {
 				c.Status(403)
 				return
 			}
 
-			app.dav.ServeHTTP(c.Writer, c.Request)
+			app.getWebdavHandler(username).ServeHTTP(c.Writer, c.Request)
 		})
 		app.engine.Handle(method, "/dav/*path", func(c *gin.Context) {
-			user, password, ok := c.Request.BasicAuth()
+			username, password, ok := c.Request.BasicAuth()
 			if !ok {
-				user = c.Request.URL.User.Username()
+				username = c.Request.URL.User.Username()
 				password, _ = c.Request.URL.User.Password()
 			}
 
-			if !app.checkPermission(user, password, c.Request.URL.Path) {
+			if !app.Permission(username, password, c.Request.URL.Path) {
 				c.Status(403)
 				return
 			}
 
-			app.dav.ServeHTTP(c.Writer, c.Request)
+			app.getWebdavHandler(username).ServeHTTP(c.Writer, c.Request)
 		})
 	}
 }
 
-func (app *WebdavApp) checkPermission(user, password, path string) bool {
+func (app *WebdavApp) Permission(user, password, path string) bool {
 	if app.authManager == nil {
 		return true
 	}
@@ -85,5 +82,18 @@ func (app *WebdavApp) checkPermission(user, password, path string) bool {
 	}
 
 	path, _ = strings.CutPrefix(path, "/dav")
-	return app.authManager.CheckPermission(user, path)
+	return app.authManager.Permission(user, path)
+}
+
+func (app *WebdavApp) getWebdavHandler(username string) *webdav.Handler {
+	dav, ok := app.davMap[username]
+	if !ok {
+		dav = &webdav.Handler{
+			Prefix:     "/dav",
+			FileSystem: fs.NewFs(app.authManager.DirMap(app.rootDir, username), app.authManager, username).ToWebdavFs(),
+			LockSystem: app.lockSystem,
+		}
+		app.davMap[username] = dav
+	}
+	return dav
 }

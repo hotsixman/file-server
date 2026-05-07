@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"file-server/module/auth"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,6 +15,8 @@ type Fs struct {
 	afero.Fs
 	pathLinks     []pathLink
 	vpathChildren map[string][]string
+	authManager   auth.AuthManager
+	username      string
 }
 
 type pathLink struct {
@@ -24,24 +27,31 @@ type pathLink struct {
 
 func NewFs(
 	vpathMap map[string]string,
+	authManager auth.AuthManager,
+	username string,
 ) *Fs {
 	pathLinks := make([]pathLink, 0)
 	vpathChildren := map[string][]string{}
 
 	for vpath, realpath := range vpathMap {
-		vpath = normalizeVirtual(vpath)
-		realpath = normalizeReal(realpath)
+		vpath = NormalizeVirtual(vpath)
+		realpath = NormalizeReal(realpath)
+
+		vpathDepth := 0
+		if vpath != string(os.PathSeparator) {
+			vpathDepth = strings.Count(vpath, string(os.PathSeparator))
+		}
 
 		pathLinks = append(pathLinks, pathLink{
 			vpath:      vpath,
 			realpath:   realpath,
-			vpathDepth: strings.Count(vpath, string(os.PathSeparator)) - 1,
+			vpathDepth: vpathDepth,
 		})
 
 		if vpath == string(os.PathSeparator) {
 			continue
 		}
-		vpathParent := normalizeVirtual(filepath.Dir(vpath[:len(vpath)-1]))
+		vpathParent := NormalizeVirtual(filepath.Dir(vpath))
 		if vpath == vpathParent {
 			continue
 		}
@@ -60,32 +70,32 @@ func NewFs(
 	return &Fs{
 		pathLinks:     pathLinks,
 		vpathChildren: vpathChildren,
+		authManager:   authManager,
+		username:      username,
 	}
 }
 
 func (fs *Fs) RealPath(vpath string) (realpath string) {
 	_vpath := filepath.Clean(vpath)
-	vpath = normalizeVirtual(vpath)
+	vpath = NormalizeVirtual(vpath)
 
 	for _, pathLink := range fs.pathLinks {
-		if strings.HasPrefix(vpath, pathLink.vpath) {
+		if Isparent(pathLink.vpath, vpath) {
 			realpath = filepath.Join(pathLink.realpath, vpath[len(pathLink.vpath):])
 			return realpath
 		}
 	}
 
-	if !strings.HasSuffix(_vpath, string(os.PathSeparator)) {
-		_vpath += string(os.PathSeparator)
-	}
 	return _vpath
 }
 
 func (fs *Fs) Create(name string) (afero.File, error) {
+	name = NormalizeVirtual(name)
 	file, err := os.Create(fs.RealPath(name))
 	if err != nil {
 		return nil, err
 	}
-	return wrapFile(file, fs, fs.vpathChildren[normalizeVirtual(name)]), nil
+	return wrapFile(file, fs, name, IsRoot(name), fs.vpathChildren[name]), nil
 }
 
 func (fs *Fs) Mkdir(name string, perm os.FileMode) error {
@@ -97,19 +107,21 @@ func (fs *Fs) MkdirAll(path string, perm os.FileMode) error {
 }
 
 func (fs *Fs) Open(name string) (afero.File, error) {
+	name = NormalizeVirtual(name)
 	file, err := os.Open(fs.RealPath(name))
 	if err != nil {
 		return nil, err
 	}
-	return wrapFile(file, fs, fs.vpathChildren[normalizeVirtual(name)]), nil
+	return wrapFile(file, fs, name, IsRoot(name), fs.vpathChildren[name]), nil
 }
 
 func (fs *Fs) OpenFile(name string, flag int, perm os.FileMode) (afero.File, error) {
+	name = NormalizeVirtual(name)
 	file, err := os.OpenFile(fs.RealPath(name), flag, perm)
 	if err != nil {
 		return nil, err
 	}
-	return wrapFile(file, fs, fs.vpathChildren[normalizeVirtual(name)]), nil
+	return wrapFile(file, fs, name, IsRoot(name), fs.vpathChildren[name]), nil
 }
 
 func (fs *Fs) Remove(name string) error {

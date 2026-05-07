@@ -3,6 +3,7 @@ package fs
 import (
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/spf13/afero"
 )
@@ -10,7 +11,9 @@ import (
 type File struct {
 	afero.File
 	fs              *Fs
+	vpath           string
 	virtualChildren []string
+	isRoot          bool
 }
 
 type FileInfo struct {
@@ -18,8 +21,8 @@ type FileInfo struct {
 	name string
 }
 
-func wrapFile(file afero.File, fs *Fs, virtualChildren []string) *File {
-	return &File{File: file, fs: fs, virtualChildren: virtualChildren}
+func wrapFile(file afero.File, fs *Fs, vpath string, isRoot bool, virtualChildren []string) *File {
+	return &File{File: file, fs: fs, vpath: vpath, isRoot: isRoot, virtualChildren: virtualChildren}
 }
 
 func wrapStat(stat os.FileInfo, name string) *FileInfo {
@@ -42,6 +45,19 @@ func (file *File) Readdir(count int) ([]os.FileInfo, error) {
 				infos = append(infos, wrapStat(stat, filepath.Base(filepath.Clean(child))))
 			}
 		}
+	}
+
+	if file.isRoot {
+		allowedDirs := file.fs.authManager.AllowedDirs(file.fs.username)
+		for i, v := range allowedDirs {
+			allowedDirs[i] = filepath.Base(filepath.Clean(v))
+		}
+		infos = slices.DeleteFunc(infos, func(e os.FileInfo) bool {
+			if !e.IsDir() {
+				//return false
+			}
+			return !slices.Contains(allowedDirs, e.Name())
+		})
 	}
 
 	if count <= 0 || len(infos) <= count {
