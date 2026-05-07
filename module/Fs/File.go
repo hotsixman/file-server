@@ -48,13 +48,13 @@ func (file *File) Readdir(count int) ([]os.FileInfo, error) {
 	}
 
 	if file.isRoot {
-		allowedDirs := file.fs.authManager.AllowedDirs(file.fs.username)
+		allowedDirs := file.fs.authManager.AllowedTopLevelDirs(file.fs.username)
 		for i, v := range allowedDirs {
 			allowedDirs[i] = filepath.Base(filepath.Clean(v))
 		}
 		infos = slices.DeleteFunc(infos, func(e os.FileInfo) bool {
 			if !e.IsDir() {
-				//return false
+				return false
 			}
 			return !slices.Contains(allowedDirs, e.Name())
 		})

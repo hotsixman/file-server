@@ -49,12 +49,13 @@ func (am *SqliteAM) Permission(username, path string) bool {
 
 func (am *SqliteAM) DirMap(rootDir string, username string) map[string]string {
 	return map[string]string{
-		"/": rootDir,
+		"/":    rootDir,
+		"/foo": "test2",
 	}
 }
 
 func (am *SqliteAM) AllowedTopLevelDirs(username string) []string {
-	return []string{"/반"}
+	return []string{"반", "foo"}
 }
 
 func (am *SqliteAM) setup() error {
@@ -89,10 +90,10 @@ func (am *SqliteAM) setup() error {
 	_, err = am.db.Exec(`
 	CREATE TABLE IF NOT EXISTS UserPermission (
 	    userId INTEGER NOT NULL,
-	    path TEXT NOT NULL,
+	    dirname TEXT NOT NULL,
 	    read BOOLEAN NOT NULL CHECK (read IN (0, 1)),
 	    write BOOLEAN NOT NULL CHECK (write IN (0, 1)),
-	    PRIMARY KEY (userId, path),
+	    PRIMARY KEY (userId, dirname),
 	    FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
 	);`)
 	if err != nil {
@@ -101,10 +102,10 @@ func (am *SqliteAM) setup() error {
 	_, err = am.db.Exec(`
 	CREATE TABLE IF NOT EXISTS GroupPermission (
 	    groupId INTEGER NOT NULL,
-	    path TEXT NOT NULL,
+	    dirname TEXT NOT NULL,
 	    read BOOLEAN NOT NULL CHECK (read IN (0, 1)),
 	    write BOOLEAN NOT NULL CHECK (write IN (0, 1)),
-	    PRIMARY KEY (groupId, path),
+	    PRIMARY KEY (groupId, dirname),
 	    FOREIGN KEY (groupId) REFERENCES "Group"(id) ON DELETE CASCADE
 	);`)
 	if err != nil {
@@ -141,14 +142,14 @@ type GroupMember struct {
 	userId  int
 }
 type UserPermission struct {
-	userId int
-	path   string
-	read   bool
-	write  bool
+	userId  int
+	dirname string
+	read    bool
+	write   bool
 }
 type GroupPermission struct {
 	groupId int
-	path    string
+	dirname string
 	read    bool
 	write   bool
 }

@@ -2,18 +2,22 @@ package fs
 
 import (
 	"os"
+	pathUtil "path"
 	"path/filepath"
 	"strings"
 )
 
+// vpath는 항상 '/'를 사용함
 func NormalizeVirtual(path string) string {
-	path = filepath.Clean(path)
-	if !strings.HasPrefix(path, string(os.PathSeparator)) {
-		path = string(os.PathSeparator) + path
+	path = pathUtil.Clean(path)
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
 	}
-	path = filepath.Clean(path)
+	path = pathUtil.Clean(path)
 	return path
 }
+
+// realpath는 `os.PathSeparator`를 사용함
 func NormalizeReal(path string) string {
 	path = filepath.Clean(path)
 	if !strings.HasPrefix(path, string(os.PathSeparator)) {
@@ -47,5 +51,5 @@ func Isparent(parent, child string) bool {
 
 func IsRoot(path string) bool {
 	path = filepath.Clean(path)
-	return path == string(os.PathSeparator)
+	return path == string(os.PathSeparator) || path == "/"
 }

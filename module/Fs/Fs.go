@@ -3,6 +3,7 @@ package fs
 import (
 	"file-server/module/auth"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -38,8 +39,8 @@ func NewFs(
 		realpath = NormalizeReal(realpath)
 
 		vpathDepth := 0
-		if vpath != string(os.PathSeparator) {
-			vpathDepth = strings.Count(vpath, string(os.PathSeparator))
+		if !IsRoot(vpath) {
+			vpathDepth = strings.Count(vpath, "/")
 		}
 
 		pathLinks = append(pathLinks, pathLink{
@@ -48,10 +49,10 @@ func NewFs(
 			vpathDepth: vpathDepth,
 		})
 
-		if vpath == string(os.PathSeparator) {
+		if IsRoot(vpath) {
 			continue
 		}
-		vpathParent := NormalizeVirtual(filepath.Dir(vpath))
+		vpathParent := NormalizeVirtual(filepath.ToSlash(filepath.Dir(vpath)))
 		if vpath == vpathParent {
 			continue
 		}
@@ -81,7 +82,7 @@ func (fs *Fs) RealPath(vpath string) (realpath string) {
 
 	for _, pathLink := range fs.pathLinks {
 		if Isparent(pathLink.vpath, vpath) {
-			realpath = filepath.Join(pathLink.realpath, vpath[len(pathLink.vpath):])
+			realpath = filepath.Clean(path.Join(pathLink.realpath, vpath[len(pathLink.vpath):]))
 			return realpath
 		}
 	}
@@ -89,75 +90,117 @@ func (fs *Fs) RealPath(vpath string) (realpath string) {
 	return _vpath
 }
 
-func (fs *Fs) Create(name string) (afero.File, error) {
-	name = NormalizeVirtual(name)
-	file, err := os.Create(fs.RealPath(name))
+func (fs *Fs) Create(vpath string) (afero.File, error) {
+	vpath = path.Clean(vpath)
+	if !path.IsAbs(vpath) {
+		vpath = "/" + vpath
+	}
+	file, err := os.Create(fs.RealPath(vpath))
 	if err != nil {
 		return nil, err
 	}
-	return wrapFile(file, fs, name, IsRoot(name), fs.vpathChildren[name]), nil
+
+	return wrapFile(file, fs, vpath, IsRoot(vpath), fs.vpathChildren[vpath]), nil
 }
 
-func (fs *Fs) Mkdir(name string, perm os.FileMode) error {
-	return os.Mkdir(fs.RealPath(name), perm)
+func (fs *Fs) Mkdir(vpath string, perm os.FileMode) error {
+	return os.Mkdir(fs.RealPath(vpath), perm)
 }
 
-func (fs *Fs) MkdirAll(path string, perm os.FileMode) error {
-	return os.MkdirAll(fs.RealPath(path), perm)
+func (fs *Fs) MkdirAll(vpath string, perm os.FileMode) error {
+	return os.MkdirAll(fs.RealPath(vpath), perm)
 }
 
-func (fs *Fs) Open(name string) (afero.File, error) {
-	name = NormalizeVirtual(name)
-	file, err := os.Open(fs.RealPath(name))
+func (fs *Fs) Open(vpath string) (afero.File, error) {
+	vpath = path.Clean(vpath)
+	if !path.IsAbs(vpath) {
+		vpath = "/" + vpath
+	}
+	file, err := os.Open(fs.RealPath(vpath))
 	if err != nil {
 		return nil, err
 	}
-	return wrapFile(file, fs, name, IsRoot(name), fs.vpathChildren[name]), nil
+	return wrapFile(file, fs, vpath, IsRoot(vpath), fs.vpathChildren[vpath]), nil
 }
 
-func (fs *Fs) OpenFile(name string, flag int, perm os.FileMode) (afero.File, error) {
-	name = NormalizeVirtual(name)
-	file, err := os.OpenFile(fs.RealPath(name), flag, perm)
+func (fs *Fs) OpenFile(vpath string, flag int, perm os.FileMode) (afero.File, error) {
+	vpath = path.Clean(vpath)
+	if !path.IsAbs(vpath) {
+		vpath = "/" + vpath
+	}
+	file, err := os.OpenFile(fs.RealPath(vpath), flag, perm)
 	if err != nil {
 		return nil, err
 	}
-	return wrapFile(file, fs, name, IsRoot(name), fs.vpathChildren[name]), nil
+	return wrapFile(file, fs, vpath, IsRoot(vpath), fs.vpathChildren[vpath]), nil
 }
 
-func (fs *Fs) Remove(name string) error {
-	return os.Remove(fs.RealPath(name))
+func (fs *Fs) Remove(vpath string) error {
+	vpath = path.Clean(vpath)
+	if !path.IsAbs(vpath) {
+		vpath = "/" + vpath
+	}
+	return os.Remove(fs.RealPath(vpath))
 }
 
-func (fs *Fs) RemoveAll(path string) error {
-	return os.RemoveAll(fs.RealPath(path))
+func (fs *Fs) RemoveAll(vpath string) error {
+	vpath = path.Clean(vpath)
+	if !path.IsAbs(vpath) {
+		vpath = "/" + vpath
+	}
+	return os.RemoveAll(fs.RealPath(vpath))
 }
 
-func (fs *Fs) Rename(oldname, newname string) error {
-	return os.Rename(fs.RealPath(oldname), fs.RealPath(newname))
+func (fs *Fs) Rename(oldvpath, newvpath string) error {
+	oldvpath = path.Clean(oldvpath)
+	if !path.IsAbs(oldvpath) {
+		oldvpath = "/" + oldvpath
+	}
+	newvpath = path.Clean(newvpath)
+	if !path.IsAbs(newvpath) {
+		newvpath = "/" + newvpath
+	}
+	return os.Rename(fs.RealPath(oldvpath), fs.RealPath(newvpath))
 }
 
-func (fs *Fs) Stat(name string) (os.FileInfo, error) {
-	stat, err := os.Stat(fs.RealPath(name))
+func (fs *Fs) Stat(vpath string) (os.FileInfo, error) {
+	vpath = path.Clean(vpath)
+	if !path.IsAbs(vpath) {
+		vpath = "/" + vpath
+	}
+	stat, err := os.Stat(fs.RealPath(vpath))
 	if err != nil {
 		return nil, err
 	}
-	return wrapStat(stat, filepath.Base(filepath.Clean(name))), nil
+	return wrapStat(stat, filepath.Base(filepath.Clean(vpath))), nil
 }
 
 func (fs *Fs) Name() string {
 	return "FileSystem"
 }
 
-func (fs *Fs) Chmod(name string, mode os.FileMode) error {
-	return os.Chmod(fs.RealPath(name), mode)
+func (fs *Fs) Chmod(vpath string, mode os.FileMode) error {
+	vpath = path.Clean(vpath)
+	if !path.IsAbs(vpath) {
+		vpath = "/" + vpath
+	}
+	return os.Chmod(fs.RealPath(vpath), mode)
 }
 
-func (fs *Fs) Chown(name string, uid, gid int) error {
-	return os.Chown(fs.RealPath(name), uid, gid)
+func (fs *Fs) Chown(vpath string, uid, gid int) error {
+	vpath = path.Clean(vpath)
+	if !path.IsAbs(vpath) {
+		vpath = "/" + vpath
+	}
+	return os.Chown(fs.RealPath(vpath), uid, gid)
 }
 
-func (fs *Fs) Chtimes(name string, atime time.Time, mtime time.Time) error {
-	return os.Chtimes(fs.RealPath(name), atime, mtime)
+func (fs *Fs) Chtimes(vpath string, atime time.Time, mtime time.Time) error {
+	vpath = path.Clean(vpath)
+	if !path.IsAbs(vpath) {
+		vpath = "/" + vpath
+	}
+	return os.Chtimes(fs.RealPath(vpath), atime, mtime)
 }
 
 func (fs *Fs) ToWebdavFs() *WebdavFs {

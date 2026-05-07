@@ -14,7 +14,7 @@ filepath 패키지 대신 path 패키지를 사용하십시오.
 type AuthManager interface {
 	Authenticate(username, password string) bool
 
-	Permission(username, path string) Permission
+	Permission(username, path string) bool
 	Permissions(username, paths []string) map[string]Permission
 	ReadPermission(username, path string) bool
 	ReadPermissions(username, paths []string) map[string]bool
@@ -22,7 +22,7 @@ type AuthManager interface {
 	WritePermissions(username, paths []string) map[string]bool
 
 	DirMap(rootDir string, username string) map[string]string
-	AllowedDirs(username string) []string
+	AllowedTopLevelDirs(username string) []string
 }
 
 type NoPermissionError struct {
