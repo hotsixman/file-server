@@ -11,14 +11,14 @@ import (
 
 type FtpMainDriver struct {
 	ftpserverlib.MainDriver
-	rootDir     string
-	authManager auth.AuthManager
+	authManager *auth.AuthManager
 	address     string
 	listener    net.Listener
+	dirMap      map[string]string
 }
 
-func newMainDriver(rootDir string) *FtpMainDriver {
-	return &FtpMainDriver{rootDir: rootDir}
+func newMainDriver(dirMap map[string]string) *FtpMainDriver {
+	return &FtpMainDriver{dirMap: dirMap}
 }
 
 func (driver *FtpMainDriver) GetSettings() (*ftpserverlib.Settings, error) {
@@ -39,7 +39,7 @@ func (driver *FtpMainDriver) AuthUser(cc ftpserverlib.ClientContext, user, pass 
 	if !driver.authManager.Authenticate(user, pass) {
 		return nil, errors.New("Invalid User or Password.")
 	}
-	return newClientDriver(user, driver.rootDir, driver.authManager), nil
+	return newClientDriver(user, driver.dirMap, driver.authManager), nil
 }
 
 func (driver *FtpMainDriver) GetTLSConfig() (*tls.Config, error) {

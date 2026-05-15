@@ -11,19 +11,19 @@ import (
 
 type WebdavApp struct {
 	engine      *gin.Engine
-	authManager auth.AuthManager
+	authManager *auth.AuthManager
 	lockSystem  webdav.LockSystem
 	davMap      map[string]*webdav.Handler
-	rootDir     string
+	dirMap      map[string]string
 }
 
-func NewWebdavApp(rootDir string, lockSystem webdav.LockSystem, authManager auth.AuthManager) *WebdavApp {
+func NewWebdavApp(dirMap map[string]string, lockSystem webdav.LockSystem, authManager *auth.AuthManager) *WebdavApp {
 	app := &WebdavApp{
 		engine:      gin.Default(),
 		authManager: authManager,
 		lockSystem:  lockSystem,
 		davMap:      map[string]*webdav.Handler{},
-		rootDir:     rootDir,
+		dirMap:      dirMap,
 	}
 
 	app.registerHandlers()
@@ -90,7 +90,7 @@ func (app *WebdavApp) getWebdavHandler(username string) *webdav.Handler {
 	if !ok {
 		dav = &webdav.Handler{
 			Prefix:     "/dav",
-			FileSystem: fs.NewFs(app.authManager.DirMap(app.rootDir, username), app.authManager, username).ToWebdavFs(),
+			FileSystem: fs.NewFs(app.authManager.DirMap(username, app.dirMap), app.authManager, username).ToWebdavFs(),
 			LockSystem: app.lockSystem,
 		}
 		app.davMap[username] = dav

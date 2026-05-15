@@ -12,20 +12,20 @@ import (
 type FtpClientDriver struct {
 	afero.Fs
 	username    string
-	authManager auth.AuthManager
-	rootDir     string
+	authManager *auth.AuthManager
+	dirMap      map[string]string
 }
 
 func newClientDriver(
 	username string,
-	rootDir string,
-	authManager auth.AuthManager,
+	dirMap map[string]string,
+	authManager *auth.AuthManager,
 ) *FtpClientDriver {
 	driver := &FtpClientDriver{
-		Fs:          fs.NewFs(authManager.DirMap(rootDir, username), authManager, username),
+		Fs:          fs.NewFs(authManager.DirMap(username, dirMap), authManager, username),
 		username:    username,
-		rootDir:     rootDir,
 		authManager: authManager,
+		dirMap:      dirMap,
 	}
 	return driver
 }

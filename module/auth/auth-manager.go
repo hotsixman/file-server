@@ -6,18 +6,17 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-type SqliteAM struct {
-	AuthManager
+type AuthManager struct {
 	db *sql.DB
 }
 
-func NewSqliteAM() (*SqliteAM, error) {
+func NewAuthManager() (*AuthManager, error) {
 	db, err := sql.Open("sqlite", "main.db")
 	if err != nil {
 		return nil, err
 	}
 
-	am := &SqliteAM{
+	am := &AuthManager{
 		db: db,
 	}
 	err = am.setup()
@@ -29,37 +28,16 @@ func NewSqliteAM() (*SqliteAM, error) {
 	return am, nil
 }
 
-func (am *SqliteAM) Authenticate(username, password string) bool {
-	var count int
-	err := am.db.QueryRow("SELECT COUNT(*) AS COUNT FROM User Where username = ? AND password = ?", username, password).Scan(&count)
+//setup
+
+func (am *AuthManager) setup() error {
+	tx, err := am.db.Begin()
 	if err != nil {
-		return false
+		return err
 	}
+	defer tx.Rollback()
 
-	if count > 0 {
-		return true
-	} else {
-		return false
-	}
-}
-
-func (am *SqliteAM) Permission(username, path string) bool {
-	return true
-}
-
-func (am *SqliteAM) DirMap(rootDir string, username string) map[string]string {
-	return map[string]string{
-		"/":    rootDir,
-		"/foo": "test2",
-	}
-}
-
-func (am *SqliteAM) AllowedTopLevelDirs(username string) []string {
-	return []string{"반", "foo"}
-}
-
-func (am *SqliteAM) setup() error {
-	_, err := am.db.Exec(`
+	_, err = tx.Exec(`
 	CREATE TABLE IF NOT EXISTS User (
     	id INTEGER PRIMARY KEY AUTOINCREMENT,
     	username TEXT NOT NULL UNIQUE,
@@ -68,7 +46,7 @@ func (am *SqliteAM) setup() error {
 	if err != nil {
 		return err
 	}
-	_, err = am.db.Exec(`
+	_, err = tx.Exec(`
 	CREATE TABLE IF NOT EXISTS "Group" (
     	id INTEGER PRIMARY KEY AUTOINCREMENT,
     	name TEXT NOT NULL UNIQUE
@@ -76,7 +54,7 @@ func (am *SqliteAM) setup() error {
 	if err != nil {
 		return err
 	}
-	_, err = am.db.Exec(`
+	_, err = tx.Exec(`
 	CREATE TABLE IF NOT EXISTS GroupMember (
 		groupId INTEGER NOT NULL,
 		userId INTEGER NOT NULL,
@@ -87,7 +65,7 @@ func (am *SqliteAM) setup() error {
 	if err != nil {
 		return err
 	}
-	_, err = am.db.Exec(`
+	_, err = tx.Exec(`
 	CREATE TABLE IF NOT EXISTS UserPermission (
 	    userId INTEGER NOT NULL,
 	    dirname TEXT NOT NULL,
@@ -99,7 +77,7 @@ func (am *SqliteAM) setup() error {
 	if err != nil {
 		return err
 	}
-	_, err = am.db.Exec(`
+	_, err = tx.Exec(`
 	CREATE TABLE IF NOT EXISTS GroupPermission (
 	    groupId INTEGER NOT NULL,
 	    dirname TEXT NOT NULL,
@@ -112,17 +90,69 @@ func (am *SqliteAM) setup() error {
 		return err
 	}
 
-	var count int
-	err = am.db.QueryRow("SELECT COUNT(*) FROM User").Scan(&count)
+	userId, err := am.setupAdminUser(tx)
 	if err != nil {
 		return err
 	}
-	if count == 0 {
-		_, err = am.db.Exec("INSERT INTO `User` (`username`, `password`) VALUES ('admin', '1234')")
+	err = am.setupAdminGroup(tx, userId)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	return err
+}
+
+// 어드민 유저를 새로 만들었을 때에만 userId가 -1이 아님
+func (am *AuthManager) setupAdminUser(tx *sql.Tx) (userId int64, err error) {
+	var count int
+
+	err = tx.QueryRow("SELECT COUNT(*) FROM User").Scan(&count)
+	if err != nil {
+		return -1, err
+	}
+
+	if count > 0 {
+		return -1, nil
+	}
+
+	result, err := tx.Exec("INSERT INTO `User` (`username`, `password`) VALUES ('admin', '0000')")
+	if err != nil {
+		return -1, nil
+	}
+	userId, err = result.LastInsertId()
+	if err != nil {
+		return -1, nil
+	}
+
+	return userId, nil
+}
+
+func (am *AuthManager) setupAdminGroup(tx *sql.Tx, userId int64) error {
+	var groupId int64
+	err := tx.QueryRow("SELECT `id` FROM `Group` WHERE `name` = 'admin'").Scan(&groupId)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			result, err := tx.Exec("INSERT INTO `Group` (`name`) VALUES ('admin')")
+			if err != nil {
+				return err
+			}
+			groupId, err = result.LastInsertId()
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+
+	if userId != -1 {
+		_, err = tx.Exec("INSERT INTO `GroupMember` (`groupId`, `userId`) VALUES (?, ?)", groupId, userId)
 		if err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -142,13 +172,15 @@ type GroupMember struct {
 	userId  int
 }
 type UserPermission struct {
-	userId  int
+	userId int
+	// `/`로 시작해야함
 	dirname string
 	read    bool
 	write   bool
 }
 type GroupPermission struct {
 	groupId int
+	// `/`로 시작해야함
 	dirname string
 	read    bool
 	write   bool

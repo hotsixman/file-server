@@ -16,7 +16,7 @@ type Fs struct {
 	afero.Fs
 	pathLinks     []pathLink
 	vpathChildren map[string][]string
-	authManager   auth.AuthManager
+	authManager   *auth.AuthManager
 	username      string
 }
 
@@ -28,7 +28,7 @@ type pathLink struct {
 
 func NewFs(
 	vpathMap map[string]string,
-	authManager auth.AuthManager,
+	authManager *auth.AuthManager,
 	username string,
 ) *Fs {
 	pathLinks := make([]pathLink, 0)

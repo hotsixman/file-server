@@ -10,11 +10,11 @@ import (
 type FtpApp struct {
 	server      *ftpserver.FtpServer
 	driver      *FtpMainDriver
-	authManager auth.AuthManager
+	authManager *auth.AuthManager
 }
 
-func NewFtpApp(rootDir string, authManager auth.AuthManager) *FtpApp {
-	driver := newMainDriver(rootDir)
+func NewFtpApp(dirMap map[string]string, authManager *auth.AuthManager) *FtpApp {
+	driver := newMainDriver(dirMap)
 	app := &FtpApp{
 		server:      ftpserver.NewFtpServer(driver),
 		driver:      driver,
